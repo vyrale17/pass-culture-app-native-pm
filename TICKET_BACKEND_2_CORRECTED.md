@@ -119,7 +119,8 @@ def _get_artists(self, offer: models.Offer) -> list[OfferArtist]:
                 id=str(link.artist.id),
                 name=link.artist.name,
                 image=link.artist.image,
-                role=link.artist_type  # Depuis Ticket 1
+                role=link.artist_type,  # Depuis Ticket 1
+                hasArtistPage=True  # Toujours vrai pour artistes référencés du produit
             )
             for link in offer.product.artist_links
             if not link.artist.is_blacklisted
@@ -132,7 +133,8 @@ def _get_artists(self, offer: models.Offer) -> list[OfferArtist]:
                 id=str(link.artist.id) if link.artist else None,
                 name=link.custom_name if link.custom_name else link.artist.name,
                 image=link.artist.image if link.artist else None,
-                role=link.artist_type  # Depuis Ticket 1
+                role=link.artist_type,  # Depuis Ticket 1
+                hasArtistPage=link.artist_id is not None  # True si référencé, False si custom
             )
             for link in offer.artist_links
         ]
@@ -140,7 +142,40 @@ def _get_artists(self, offer: models.Offer) -> list[OfferArtist]:
     return artists
 ```
 
-### 3. Gérer les artistes customisés (sans `artist_id`)
+### 3. Ajouter le champ `hasArtistPage` (cliquabilité)
+
+**Objectif** : Indiquer explicitement si l'artiste a une page dédiée dans l'app (donc cliquable).
+
+**Pourquoi ce champ ?**
+Plutôt que de forcer le frontend à inférer la cliquabilité avec `id != null`, il est plus clair d'avoir un champ explicite. Cela améliore :
+- **La clarté de l'API** : Le frontend n'a pas à deviner
+- **L'évolutivité** : Si demain la règle change, seul ce champ est impacté
+- **La documentation** : Plus facile à documenter dans l'OpenAPI spec
+
+**Type** : `boolean`
+
+**Règle de calcul** :
+- Si artiste référencé (`artist_id != null`) → `hasArtistPage = true`
+- Si artiste custom (`artist_id == null`) → `hasArtistPage = false`
+
+**Utilisation frontend** :
+- Si `hasArtistPage === true` → Afficher le chevron 〉 et permettre la navigation vers la page artiste
+- Si `hasArtistPage === false` → Pas de chevron, affichage en texte simple (non cliquable)
+
+**Modification du modèle `OfferArtist`** :
+
+**Fichier** : `api/src/pcapi/routes/native/v1/serialization/offers.py`
+
+```python
+class OfferArtist(BaseModel):
+    id: str | None
+    name: str
+    image: str | None = None
+    role: str
+    hasArtistPage: bool  # ← NOUVEAU CHAMP
+```
+
+### 4. Gérer les artistes customisés (sans `artist_id`)
 
 Pour les offres sans produit, les pros peuvent ajouter :
 - **Artistes existants** : `artist_id` renseigné, `custom_name` = NULL
@@ -183,13 +218,15 @@ offer.artist_links = []  # Vide (ou ignoré si rempli)
       "id": "uuid-nolan",
       "name": "Christopher Nolan",
       "image": "https://...",
-      "role": "STAGE_DIRECTOR"
+      "role": "STAGE_DIRECTOR",
+      "hasArtistPage": true
     },
     {
       "id": "uuid-dicaprio",
       "name": "Leonardo DiCaprio",
       "image": "https://...",
-      "role": "PERFORMER"
+      "role": "PERFORMER",
+      "hasArtistPage": true
     }
   ]
 }
@@ -217,13 +254,15 @@ offer.artist_links = [
       "id": "789",
       "name": "Quentin Tarantino",
       "image": "https://...",
-      "role": "DIRECTOR"
+      "role": "DIRECTOR",
+      "hasArtistPage": true
     },
     {
       "id": null,
       "name": "Invité surprise",
       "image": null,
-      "role": "SPEAKER"
+      "role": "SPEAKER",
+      "hasArtistPage": false
     }
   ]
 }
@@ -270,7 +309,9 @@ def test_get_offer_with_product_ignores_offer_artists():
     # Then
     assert len(response.json()["artists"]) == 2
     assert response.json()["artists"][0]["name"] == "Nolan"
+    assert response.json()["artists"][0]["hasArtistPage"] is True
     assert response.json()["artists"][1]["name"] == "DiCaprio"
+    assert response.json()["artists"][1]["hasArtistPage"] is True
     # "Guest" ne doit PAS être dans la réponse (exclusion mutuelle)
     assert "Guest" not in [a["name"] for a in response.json()["artists"]]
 ```
@@ -305,10 +346,12 @@ def test_get_offer_without_product_uses_offer_artists():
     assert len(response.json()["artists"]) == 2
     assert response.json()["artists"][0]["name"] == "Tarantino"
     assert response.json()["artists"][0]["id"] is not None
+    assert response.json()["artists"][0]["hasArtistPage"] is True
 
     # Artiste customisé
     assert response.json()["artists"][1]["name"] == "Invité surprise"
     assert response.json()["artists"][1]["id"] is None
+    assert response.json()["artists"][1]["hasArtistPage"] is False
 ```
 
 ### Test 3 : Offre avec produit blacklisté
@@ -423,11 +466,14 @@ Les artistes customisés (sans `artist_id`) doivent retourner :
   "id": null,
   "name": "Invité surprise",
   "image": null,
-  "role": "SPEAKER"
+  "role": "SPEAKER",
+  "hasArtistPage": false
 }
 ```
 
-L'app frontend devra gérer le cas `id === null` → artiste non cliquable (pas de page artiste).
+L'app frontend utilisera le champ `hasArtistPage` pour déterminer si l'artiste est cliquable :
+- `hasArtistPage: true` → Afficher chevron et permettre navigation
+- `hasArtistPage: false` → Texte simple, non cliquable
 
 ---
 
@@ -436,6 +482,7 @@ L'app frontend devra gérer le cas `id === null` → artiste non cliquable (pas 
 | Fichier | Modification |
 |---------|-------------|
 | `repository.py#L375` | Ajouter jointures pour `offer.artist_links` |
-| `serialization/offers.py#L287` | Implémenter logique d'exclusion mutuelle `if offer.product` |
-| `offers_test.py` | Ajouter tests pour les 2 cas (avec/sans produit) |
+| `serialization/offers.py` (modèle) | Ajouter champ `hasArtistPage: bool` dans `OfferArtist` |
+| `serialization/offers.py#L287` | Implémenter logique d'exclusion mutuelle `if offer.product` + calcul `hasArtistPage` |
+| `offers_test.py` | Ajouter tests pour les 2 cas (avec/sans produit) + vérification `hasArtistPage` |
 | `sandboxes/creators/__init__.py#L292` | Créer offres de test pour les 2 cas |
