@@ -70,35 +70,19 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 
 ---
 
-### 3. ⚠️ À VALIDER : Champ `hasArtistPage` ou pas ?
+### 3. Règle de cliquabilité des artistes
 
-**Question bloquante à clarifier avec l'équipe** :
+**✅ Règle confirmée** :
 
-> **Un artiste avec un `id` peut-il ne pas avoir de page artiste ?**
+> Un artiste avec un `id` a toujours une page artiste. Un artiste sans `id` (saisi manuellement) n'en a pas.
 
-**Scénario A** : NON - Tous les artistes avec ID ont une page
-- → Pas besoin du champ `hasArtistPage`
-- → Le frontend utilise simplement `id != null` pour déterminer la cliquabilité
+**Conclusion** :
+- ❌ Pas besoin du champ `hasArtistPage` (serait redondant)
+- ✅ Le frontend utilise simplement `id != null` pour déterminer la cliquabilité
 
-**Scénario B** : OUI - Un artiste avec ID peut ne pas avoir de page (ex: artiste en cours de création, désactivé, etc.)
-- → Besoin du champ `hasArtistPage` explicite
-- → Ajouter `hasArtistPage: bool` dans le modèle `OfferArtist`
-
-**Recommandation frontend** : Si la règle est simplement `id != null`, alors `hasArtistPage` est redondant.
-
-**À décider** : Valider avec l'équipe backend/produit quel scénario s'applique.
-
----
-
-### Si Scénario B retenu : Ajouter le champ `hasArtistPage`
-
-**Fichier** : `api/src/pcapi/routes/native/v1/serialization/offers.py`
-
-**Action** :
-- Ajouter le champ `hasArtistPage: bool` dans le modèle `OfferArtist`
-- Calculer sa valeur selon la règle métier validée
-
-**Pourquoi ce champ ?** Évite au frontend d'inférer la cliquabilité. Rend l'API plus claire et évolutive si la règle change.
+**Logique frontend** :
+- Si `id != null` → Artiste référencé → Afficher chevron + permettre navigation
+- Si `id === null` → Artiste custom → Pas de chevron, texte simple
 
 ---
 
@@ -108,13 +92,12 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 
 ### Champs pour chaque artiste
 
-| Champ | Type | Description | Obligatoire |
-|-------|------|-------------|-------------|
-| `id` | `string` ou `null` | ID artiste ou null si custom | ✅ Oui |
-| `name` | `string` | Nom de l'artiste | ✅ Oui |
-| `image` | `string` ou `null` | URL photo | ✅ Oui |
-| `role` | `string` | Type d'artiste (AUTHOR, STAGE_DIRECTOR, PERFORMER, SPEAKER) | ✅ Oui |
-| `hasArtistPage` | `boolean` | Indique si cliquable | ⚠️ **À VALIDER** |
+| Champ | Type | Description |
+|-------|------|-------------|
+| `id` | `string` ou `null` | ID artiste ou null si custom. Frontend utilise `id != null` pour la cliquabilité |
+| `name` | `string` | Nom de l'artiste |
+| `image` | `string` ou `null` | URL photo |
+| `role` | `string` | Type d'artiste (AUTHOR, STAGE_DIRECTOR, PERFORMER, SPEAKER) |
 
 ### Exemples de réponses
 
@@ -162,7 +145,7 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 }
 ```
 
-**Note** : Le champ `hasArtistPage` est omis dans les exemples en attendant validation. Si Scénario B retenu, l'ajouter.
+**Note** : Le frontend détermine la cliquabilité avec `id != null`. Pas besoin de champ supplémentaire.
 
 ---
 
@@ -184,9 +167,6 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 ### Test 3 : Blacklistés
 - Vérifier que les artistes blacklistés sont filtrés (product.artists uniquement)
 
-### Test 4 : Si Scénario B retenu
-- Vérifier que `hasArtistPage` est correctement calculé selon la règle validée
-
 ---
 
 ## Sandbox
@@ -202,15 +182,6 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 
 ## Validation PM
 
-### Validation technique préalable
-
-⚠️ **BLOQUANT** : Clarifier le besoin du champ `hasArtistPage`
-- [ ] Un artiste avec ID peut-il ne pas avoir de page artiste ?
-- [ ] Si OUI → Scénario B : ajouter `hasArtistPage`
-- [ ] Si NON → Scénario A : pas de champ supplémentaire, utiliser `id != null`
-
-### Validation fonctionnelle sur sandbox
-
 ✅ **Offre avec produit** :
 - [ ] Seuls les artistes du produit s'affichent
 - [ ] Les artistes ajoutés sur l'offre (si existants) ne s'affichent PAS
@@ -222,9 +193,8 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 ✅ **Affichage frontend** :
 - [ ] Artistes avec `role = AUTHOR/STAGE_DIRECTOR/SPEAKER` → "de [X]"
 - [ ] Artistes avec `role = PERFORMER` → "Avec [Y]"
-- [ ] Artistes avec `id != null` → chevron + cliquable (si Scénario A)
-- [ ] Artistes avec `hasArtistPage = true` → chevron + cliquable (si Scénario B)
-- [ ] Artistes custom → pas de chevron, non cliquable
+- [ ] Artistes avec `id != null` → chevron + cliquable (navigation vers page artiste)
+- [ ] Artistes avec `id === null` (custom) → pas de chevron, non cliquable
 
 ---
 
@@ -232,7 +202,6 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 
 - 🔗 Dépend du Ticket 1 (champ `role` doit être implémenté d'abord)
 - ⚠️ Coordination avec équipe Pro pour vérifier la contrainte d'exclusion mutuelle
-- ⚠️ **Validation produit/backend** : Scénario A ou B pour `hasArtistPage`
 
 ---
 
@@ -241,19 +210,14 @@ Un pro qui veut ajouter des invités doit créer une offre spéciale sans produi
 | Fichier | Modification |
 |---------|-------------|
 | `repository.py#L375` | Ajouter jointures `offer.artist_links` |
-| `serialization/offers.py` (modèle) | ⚠️ **Optionnel** : Ajouter `hasArtistPage: bool` si Scénario B |
-| `serialization/offers.py#L287` | Logique exclusion mutuelle + calcul `hasArtistPage` (si applicable) |
-| `offers_test.py` | 3-4 tests selon scénario retenu |
+| `serialization/offers.py#L287` | Logique exclusion mutuelle (if offer.product) |
+| `offers_test.py` | 3 tests (exclusion, sans produit, blacklistés) |
 | `sandboxes/creators` | 2 cas de test |
 
 ---
 
-## Questions ouvertes
+## Points d'attention
 
-1. ⚠️ **PRIORITAIRE** : Un artiste avec `id` peut-il ne pas avoir de page artiste ?
-   - Impacts : Structure API, logique frontend, tests
-   - À valider avec : Équipe backend + Équipe produit
+1. **Nom de la relation** : Vérifier le nom exact `Offer.artist_links` dans le modèle (pourrait être `artists` ou `offer_artists`)
 
-2. Nom exact de la relation `Offer.artist_links` à vérifier dans le modèle
-
-3. Comportement si un artiste est à la fois dans `product.artists` et `offer.artists` (edge case technique, normalement bloqué côté Pro)
+2. **Edge case** : Comportement si un artiste est à la fois dans `product.artists` et `offer.artists` (normalement bloqué côté Pro par la contrainte d'exclusion mutuelle)
