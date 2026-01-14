@@ -199,6 +199,9 @@ export enum AnalyticsEvent {
   VENUE_SEE_MORE_CLICKED = 'VenueSeeMoreClicked',
   VIDEO_PAUSED = 'VideoPaused',
   VIEWED_BOOKING_PAGE = 'ViewedBookingPage',
+  VOLUNTEER_CALLOUT_CLICK = 'VolunteerCalloutClick',
+  VOLUNTEER_CALLOUT_CLOSE = 'VolunteerCalloutClose',
+  VOLUNTEER_INTEREST_FEEDBACK = 'VolunteerInterestFeedback',
 }
 
 const RESERVED_PREFIXES = ['firebase_', 'google_', 'ga_']

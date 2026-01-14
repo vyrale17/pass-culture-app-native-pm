@@ -4,6 +4,8 @@ import styled from 'styled-components/native'
 import { VenueResponse } from 'api/gen'
 import { ContactBlock } from 'features/venue/components/ContactBlock/ContactBlock'
 import { NoInformationPlaceholder } from 'features/venue/components/Placeholders/NoInformationPlaceholder'
+import { VolunteerCallout } from 'features/venue/components/VolunteerCallout/VolunteerCallout'
+import { VenueResponseWithVolunteer } from 'features/venue/types'
 import { isSectionWithBody } from 'features/venue/helpers/isSectionWithBody/isSectionWithBody'
 import { BasicAccessibilityInfo } from 'ui/components/accessibility/BasicAccessibilityInfo'
 import { DetailedAccessibilityInfo } from 'ui/components/accessibility/DetailedAccessibilityInfo'
@@ -14,11 +16,16 @@ import { getHeadingAttrs } from 'ui/theme/typographyAttrs/getHeadingAttrs'
 import { OpeningHours } from '../OpeningHours/OpeningHours'
 
 type Props = {
-  venue: Omit<VenueResponse, 'isVirtual'>
+  venue: Omit<VenueResponse, 'isVirtual'> | Omit<VenueResponseWithVolunteer, 'isVirtual'>
   enableAccesLibre?: boolean
+  showVolunteerInterestFeedback?: boolean
 }
 
-export const PracticalInformation: FunctionComponent<Props> = ({ venue, enableAccesLibre }) => {
+export const PracticalInformation: FunctionComponent<Props> = ({
+  venue,
+  enableAccesLibre,
+  showVolunteerInterestFeedback = false,
+}) => {
   const {
     withdrawalDetails,
     description,
@@ -30,6 +37,10 @@ export const PracticalInformation: FunctionComponent<Props> = ({ venue, enableAc
     externalAccessibilityId,
     externalAccessibilityUrl,
   } = venue
+
+  // Type guard pour vérifier si c'est un VenueResponseWithVolunteer
+  const venueWithVolunteer = venue as VenueResponseWithVolunteer
+  const hasVolunteerOpportunities = venueWithVolunteer.hasVolunteerOpportunities === true
 
   const shouldDisplayDetailedAccessibility =
     !!isOpenToPublic &&
@@ -99,12 +110,20 @@ export const PracticalInformation: FunctionComponent<Props> = ({ venue, enableAc
     },
   ].filter(isSectionWithBody)
 
-  if (sections.length === 0) {
+  if (sections.length === 0 && !hasVolunteerOpportunities) {
     return <NoInformationPlaceholder isOpenToPublic={venue.isOpenToPublic} />
   }
 
   return (
     <Container>
+      {hasVolunteerOpportunities ? (
+        <VolunteerCallout
+          venueId={venue.id}
+          venueName={venue.publicName ?? venue.name}
+          volunteerUrl={venueWithVolunteer.volunteerUrl}
+          showInterestFeedback={showVolunteerInterestFeedback}
+        />
+      ) : null}
       {sections.map((section, index) => (
         <React.Fragment key={`${section.title}-${index}`}>
           <SectionComponent title={section.title}>{section.body}</SectionComponent>

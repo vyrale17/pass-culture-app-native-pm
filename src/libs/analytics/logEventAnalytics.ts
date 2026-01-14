@@ -718,4 +718,13 @@ export const logEventAnalytics = {
     analytics.logEvent({ firebase: AnalyticsEvent.VIEW_ITEM }, params),
   logViewedBookingPage: (params: { from: Referrals; offerId: number }) =>
     analytics.logEvent({ firebase: AnalyticsEvent.VIEWED_BOOKING_PAGE }, params),
+  logVolunteerCalloutClick: (params: { venueId: number; venueName: string }) =>
+    analytics.logEvent({ firebase: AnalyticsEvent.VOLUNTEER_CALLOUT_CLICK }, params),
+  logVolunteerCalloutClose: (params: { venueId: number; venueName: string }) =>
+    analytics.logEvent({ firebase: AnalyticsEvent.VOLUNTEER_CALLOUT_CLOSE }, params),
+  logVolunteerInterestFeedback: (params: {
+    venueId: number
+    venueName: string
+    isInterested: boolean
+  }) => analytics.logEvent({ firebase: AnalyticsEvent.VOLUNTEER_INTEREST_FEEDBACK }, params),
 }

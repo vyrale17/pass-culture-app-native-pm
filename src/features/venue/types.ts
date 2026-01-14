@@ -1,10 +1,17 @@
 import { ReactNode } from 'react'
 
-import { Activity } from 'api/gen'
+import { Activity, VenueResponse as BaseVenueResponse } from 'api/gen'
 import { RootNavigateParams } from 'features/navigation/RootNavigator/types'
 import { Geoloc } from 'libs/algolia/types'
 import { Offer } from 'shared/offer/types'
 import { AccessibleIcon } from 'ui/svg/icons/types'
+
+// Extension du type VenueResponse pour supporter le bénévolat
+// TODO: À supprimer une fois que le backend aura ajouté ce champ
+export interface VenueResponseWithVolunteer extends BaseVenueResponse {
+  hasVolunteerOpportunities?: boolean
+  volunteerUrl?: string
+}
 
 export interface Venue {
   label: string
